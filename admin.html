@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hikvision Manager Pro</title>
+
+<style>
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;max-width:1100px;margin:0 auto;padding:20px;background:#eceff1}
+.container{background:#fff;padding:30px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.1)}
+h1{text-align:center;color:#c62828;margin-bottom:30px}
+.login-box{max-width:400px;margin:50px auto;text-align:center;border:1px solid #ddd;padding:30px;border-radius:12px;background:#f9f9f9}
+.login-box input{width:100%;padding:12px;margin-bottom:15px;border:1px solid #ccc;border-radius:8px}
+#admin-content{display:none}
+.form-row{display:grid;grid-template-columns:1.5fr 1.5fr 1fr 1fr;gap:15px;margin-bottom:20px}
+label{font-weight:600;color:#444}
+input{width:100%;padding:12px;border:1px solid #cfd8dc;border-radius:8px}
+.button-group{display:flex;gap:10px;margin-bottom:25px}
+button{flex:1;padding:12px;border:none;border-radius:8px;font-weight:bold;color:#fff;cursor:pointer}
+.btn-blue{background:#1e88e5}
+.btn-green{background:#43a047}
+.btn-gray{background:#607d8b}
+.btn-save{background:#fb8c00;font-size:11px;padding:5px 10px;width:auto}
+button:disabled,input:disabled{background:#eee;color:#999}
+.debug-panel{background:#263238;color:#9ccc65;padding:15px;border-radius:8px;margin:20px 0;font-family:monospace;height:120px;overflow-y:auto;font-size:12px;display:none}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{padding:12px;border-bottom:1px solid #f1f1f1}
+th{background:#f8f9fa}
+.badge-admin{background:#ffebee;color:#c62828;padding:3px 8px;border-radius:4px;font-size:11px}
+</style>
+</head>
+
+<body>
+<div class="container">
+<h1>🔴 Hikvision Manager Pro</h1>
+
+<!-- LOGIN -->
+<div id="login-section" class="login-box">
+<h3>Đăng nhập hệ thống</h3>
+<input id="web-user" placeholder="User">
+<input id="web-pass" type="password" placeholder="Password">
+<button class="btn-blue" onclick="checkLogin()">VÀO HỆ THỐNG</button>
+<p id="login-msg" style="color:red;display:none">Sai tài khoản</p>
+</div>
+
+<!-- MAIN -->
+<div id="admin-content">
+<div style="text-align:right;margin-bottom:10px">
+Đang đăng nhập: <b id="display-user"></b>
+</div>
+
+<div class="form-row">
+<div>
+<label>🏢 Đơn vị</label>
+<input list="unit-list" id="unit-input" onchange="onUnitSelect()">
+<datalist id="unit-list"></datalist>
+</div>
+<div>
+<label>🌐 IP : PORT</label>
+<input id="host">
+</div>
+<div>
+<label>👤 User admin</label>
+<input id="username" value="admin">
+</div>
+<div>
+<label>🔒 Pass admin</label>
+<input id="password" type="password">
+</div>
+</div>
+
+<div class="button-group">
+<button class="btn-blue" onclick="testConn()">⚡ Kiểm tra</button>
+<button class="btn-green" onclick="getUsers()">📥 Tải User</button>
+<button class="btn-gray" onclick="toggleLog()">📜 Nhật ký</button>
+</div>
+
+<div id="debug-log" class="debug-panel"></div>
+
+<table id="user-table" style="display:none">
+<thead>
+<tr>
+<th>ID</th><th>User</th><th>Role</th><th>Mật khẩu mới</th><th></th>
+</tr>
+</thead>
+<tbody id="result-list"></tbody>
+</table>
+
+<div id="log-box" style="display:none;margin-top:30px">
+<h3>📜 Nhật ký</h3>
+<table>
+<thead><tr><th>Time</th><th>Host</th><th>User</th><th>Status</th></tr></thead>
+<tbody id="log-list"></tbody>
+</table>
+</div>
+
+</div>
+</div>
+
+<script>
+/* ================== CẤU HÌNH QUAN TRỌNG ================== */
+const API_BASE = "http://192.168.1.251:9000"; // IP + PORT app.py
+const SHEET_ID = "1GoO08KUw2Pv_qCxH6yBtBKe0fTxXbmtRxvdZhuxiBFI";
+const API_KEY  = "AIzaSyCN8EKwG0ObVHr80JIOnSieuW0LfB3EmK8";
+/* ======================================================== */
+
+let unitData=[], loginUser="";
+
+function el(id){ return document.getElementById(id); }
+
+/* ---------- LOGIN WEB ---------- */
+async function checkLogin(){
+const u=el("web-user").value;
+const p=el("web-pass").value;
+const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Settings!A:B?key=${API_KEY}`);
+const d=await r.json();
+if((d.values||[]).some(x=>x[0]==u && x[1]==p)){
+loginUser=u;
+el("login-section").style.display="none";
+el("admin-content").style.display="block";
+el("display-user").innerText=u;
+loadUnits();
+}else el("login-msg").style.display="block";
+}
+
+/* ---------- LOAD ĐƠN VỊ ---------- */
+async function loadUnits(){
+const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${loginUser}!A:D?key=${API_KEY}`);
+const d=await r.json();
+unitData=d.values||[];
+el("unit-list").innerHTML=unitData.slice(1).map(r=>`<option value="${r[0]}">`).join("");
+}
+
+function onUnitSelect(){
+const r=unitData.find(x=>x[0]==el("unit-input").value);
+if(r){
+el("host").value=r[1]||"";
+el("password").value=r[3]||"";
+}
+}
+
+/* ---------- API CALL ---------- */
+async function api(path,data){
+const r=await fetch(API_BASE+path,{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify(data)
+});
+return r.json();
+}
+
+/* ---------- TEST ---------- */
+async function testConn(){
+const r=await api("/api/test",{
+host:el("host").value,
+user:el("username").value,
+pass:el("password").value
+});
+writeDebug(r.ok?"✅ Kết nối OK":"❌ Không kết nối được");
+}
+
+/* ---------- GET USERS ---------- */
+async function getUsers(){
+const r=await api("/api/users",{
+host:el("host").value,
+user:el("username").value,
+pass:el("password").value
+});
+
+const xml=new DOMParser().parseFromString(r.xml,"text/xml");
+const rows=[...xml.getElementsByTagName("User")];
+el("result-list").innerHTML="";
+rows.forEach(u=>{
+const id=u.getElementsByTagName("id")[0].textContent;
+const name=u.getElementsByTagName("userName")[0].textContent;
+const root=name.toLowerCase()=="admin";
+el("result-list").innerHTML+=`
+<tr>
+<td>${id}</td>
+<td><b>${name}</b></td>
+<td>${root?'<span class="badge-admin">ROOT</span>':'User'}</td>
+<td><input id="pw-${id}" ${root?'disabled':''}></td>
+<td><button class="btn-save" onclick="changePass('${id}','${name}')" ${root?'disabled':''}>💾</button></td>
+</tr>`;
+});
+el("user-table").style.display="table";
+}
+
+/* ---------- CHANGE PASS ---------- */
+async function changePass(id,name){
+const p=el("pw-"+id).value;
+if(!p) return alert("Chưa nhập mật khẩu");
+await api("/api/change",{
+host:el("host").value,
+user:el("username").value,
+pass:el("password").value,
+id:id,
+name:name,
+newpass:p
+});
+saveLog(name,"OK");
+alert("Đã gửi lệnh đổi mật khẩu");
+}
+
+/* ---------- LOG ---------- */
+function writeDebug(m){
+const d=el("debug-log");
+d.style.display="block";
+d.innerHTML+=`> ${m}<br>`;
+d.scrollTop=d.scrollHeight;
+}
+
+function saveLog(u,s){
+let l=JSON.parse(localStorage.hiklog||"[]");
+l.unshift({t:new Date().toLocaleString(),h:el("host").value,u,s});
+localStorage.hiklog=JSON.stringify(l.slice(0,50));
+}
+
+function toggleLog(){
+el("log-box").style.display=
+el("log-box").style.display?"":"block";
+el("log-list").innerHTML=
+(JSON.parse(localStorage.hiklog||"[]")).map(x=>
+`<tr><td>${x.t}</td><td>${x.h}</td><td>${x.u}</td><td>${x.s}</td></tr>`
+).join("");
+}
+</script>
+</body>
+</html>

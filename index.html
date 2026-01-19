@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đăng Nhập Hệ Thống Hikvision</title>
+
+<style>
+:root { --primary:#1976d2;--danger:#d32f2f;--success:#43a047 }
+body{
+font-family:'Segoe UI',sans-serif;
+background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);
+margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh
+}
+.card{
+background:#fff;padding:30px;border-radius:15px;
+box-shadow:0 10px 30px rgba(0,0,0,.3);
+width:100%;max-width:400px;text-align:center
+}
+h2{color:#333;margin-bottom:25px}
+.input-group{margin-bottom:15px;text-align:left}
+label{display:block;margin-bottom:5px;font-weight:bold;color:#555}
+input{
+width:100%;padding:12px;border:1px solid #ddd;
+border-radius:8px;font-size:16px
+}
+.btn-group{display:flex;gap:10px;margin-top:20px}
+button{
+flex:1;padding:12px;border:none;border-radius:8px;
+cursor:pointer;font-weight:bold;font-size:16px
+}
+.btn-login{background:var(--primary);color:white}
+.btn-cancel{background:#9e9e9e;color:white}
+.btn-tool{background:var(--success);color:white;margin-top:15px;width:100%}
+.btn-change-pw{background:#fb8c00;color:white;margin-top:10px;width:100%}
+.error{color:var(--danger);display:none;margin-top:10px}
+#action-panel,#change-pw-panel{
+margin-top:25px;border-top:2px solid #eee;padding-top:20px;display:none
+}
+</style>
+</head>
+
+<body>
+<div class="card">
+<h2>Đăng Nhập Hệ Thống</h2>
+
+<div class="input-group">
+<label>Username</label>
+<input id="username">
+</div>
+
+<div class="input-group">
+<label>Mật khẩu</label>
+<input id="password" type="password">
+</div>
+
+<div class="btn-group">
+<button class="btn-login" onclick="login()">ĐĂNG NHẬP</button>
+<button class="btn-cancel" onclick="clearForm()">XÓA</button>
+</div>
+
+<p id="error" class="error">Sai tài khoản hoặc mật khẩu</p>
+
+<div id="action-panel">
+<button class="btn-tool" onclick="openTool()">🚀 MỞ TOOL QUẢN TRỊ</button>
+<button class="btn-change-pw" onclick="toggleChange()">🔐 ĐỔI MẬT KHẨU WEB</button>
+
+<div id="change-pw-panel">
+<div class="input-group">
+<label>Mật khẩu mới</label>
+<input id="newpw" type="password">
+</div>
+<div class="input-group">
+<label>Xác nhận mật khẩu</label>
+<input id="confirmpw" type="password">
+</div>
+<div class="btn-group">
+<button class="btn-login" onclick="updatePW()">LƯU</button>
+<button class="btn-cancel" onclick="toggleChange()">HỦY</button>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+const API_KEY="AIzaSyCN8EKwG0ObVHr80JIOnSieuW0LfB3EmK8";
+const SHEET_ID="1GoO08KUw2Pv_qCxH6yBtBKe0fTxXbmtRxvdZhuxiBFI";
+const RANGE="Settings!A:B";
+const SCRIPT_URL="https://script.google.com/macros/s/AKfycbz15g09UWLmX0m9h48xGzwhk1UGM5d6GkkU1xwgIBRObgWCzP3GvN2_1pGJmNI8yupNvw/exec";
+
+function el(id){ return document.getElementById(id); }
+
+async function login(){
+const u = el("username").value;
+const p = el("password").value;
+const err = el("error");
+
+try{
+const r = await fetch(
+`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`
+);
+const d = await r.json();
+if((d.values||[]).some(x=>x[0]==u && x[1]==p)){
+err.style.display="none";
+el("action-panel").style.display="block";
+}else{
+err.style.display="block";
+}
+}catch(e){
+alert("Không kết nối được Google Sheets");
+}
+}
+
+function clearForm(){
+el("username").value="";
+el("password").value="";
+el("action-panel").style.display="none";
+el("error").style.display="none";
+}
+
+function openTool(){
+window.location.href="admin.html";
+}
+
+function toggleChange(){
+const p = el("change-pw-panel");
+p.style.display = p.style.display==="block"?"none":"block";
+}
+
+async function updatePW(){
+if(el("newpw").value.length<8) return alert("Mật khẩu ≥ 8 ký tự");
+if(el("newpw").value!==el("confirmpw").value) return alert("Không khớp");
+
+await fetch(SCRIPT_URL,{
+method:"POST",
+mode:"no-cors",
+body:JSON.stringify({
+user:el("username").value,
+newPass:el("newpw").value
+})
+});
+alert("Đã gửi yêu cầu");
+toggleChange();
+}
+</script>
+</body>
+</html>
